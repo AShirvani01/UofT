@@ -1,21 +1,21 @@
-### Drive Failure Code ###
-#Data was compiled with python and stored in SQL db
+### Drive Failure Analysis ###
+# Data was compiled with python and stored in SQL db
 
 ## Read in libraries
 library(dplyr)
 library(ggplot2)
 library(scales)
 library(survival)
-set.seed(1)
 
 
 ## Import/Clean Data
-
 df <- read.csv("C:/Users/abtin/Documents/SQL/hd_failure2.csv")
 df <- df |> filter(model != " 00MD00")
 
+
 ## Check for missing capacity
 df |> filter(capacity == -1)
+
 
 ## Filling in missing capacity values
 df <- df |>
@@ -35,9 +35,10 @@ df <- df |>
     capacity %in% c(6.000000e+05,1.070000e+05), 
     4.000000e+00,capacity)) #Fix incorrect capacity values
 
-## Creating brand column
 
+## Creating brand column
 df |> select(model) |> unique() #All unique models
+
 
 # Assigning brand names to each model
 df <- df |>
@@ -54,8 +55,8 @@ df <- df |>
     model %in% c("SSDSCKKB480G8R","SSDSCKKB240GZR") ~ "Intel",
     .default = NA))
 
-## Visualize proportion of failures by top 4 brands
 
+## Visualize proportion of failures by top 4 brands
 df |>
   filter(brand %in% c("Seagate","Toshiba","Western Digital","HGST")) |>
   ggplot(aes(y=brand,fill=factor(failure,labels=c("No","Yes")))) +
@@ -83,32 +84,28 @@ res <- summary(fit.km)
 cols <- lapply(c(2:6, 8:11) , function(x) res[x])
 dat <- do.call(data.frame,cols)
 
-
 dat |>
   ggplot(aes(x=time,y=surv,color=strata)) +
   geom_step() +
   xlab("Time") +
   ylab("Survival Probability")
 
-
 log.test <- survdiff(Surv(observed_time,failure) ~ capacity, data=df2)
 log.test
 
 
-## Fit KM estiamtes for brand
+## Fit KM estimates for brand
 fit.km <- survfit(Surv(observed_time,failure) ~ brand, data=df2)
 
 res <- summary(fit.km)
 cols <- lapply(c(2:6, 8:11) , function(x) res[x])
 dat <- do.call(data.frame,cols)
 
-
 dat |>
   ggplot(aes(x=time,y=surv,color=strata)) +
   geom_step() +
   xlab("Time") +
   ylab("Survival Probability")
-
 
 log.test <- survdiff(Surv(observed_time,failure) ~ brand, data=df2)
 log.test
