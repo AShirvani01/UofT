@@ -1,11 +1,11 @@
 -- Checking number of failures for each type of drive
 SELECT 
 	serial_number,
-    COUNT(failure) AS num_of_failures
+	COUNT(failure) AS num_of_failures
 FROM hard_drive.hd_failure
 GROUP BY 
 	serial_number,
-    failure
+	failure
 HAVING failure = 1;
 
 -- Survival time for each type of drive
@@ -18,7 +18,7 @@ SELECT
 	DATEDIFF(MAX(date),MIN(date)) AS observed_time, 
 	MAX(failure) AS failure
 FROM hard_drive.hd_failure
-GROUP BY 
+GROUP BY
 	serial_number,
-    model;
+	model;
 
