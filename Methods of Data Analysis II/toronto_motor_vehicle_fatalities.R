@@ -1,7 +1,6 @@
 ### Identifying Risk Factors of Fatal MVCs Using Logistic Regression ###
 
-#Importing Libraries
-
+# Importing Libraries
 library(dplyr)
 library(tidyr)
 library(glmnet)
@@ -13,33 +12,19 @@ library(ggplot2)
 library(olsrr)
 library(knitr)
 library(gtsummary)
+set.seed(1)
 
 
-#Predictors of Interest: Speeding, IMPACTTYPE, INVAGE, PEDESTRIAN, ALCOHOL
-
-#Read in dataset
+# Read in dataset
+# Predictors of Interest: Speeding, IMPACTTYPE, INVAGE, PEDESTRIAN, ALCOHOL
 df <- read.csv("~/datasets/toronto_motor_vehicle_collisions.csv", row.names=1)
 df <- subset(df, select=-c(ACCNUM,DATE,STREET1,STREET2,OFFSET,DISTRICT,WARDNUM,
                            ACCLOC,INJURY,FATAL_NO,VEHTYPE,CYCLISTYPE,CYCACT,
                            CYCCOND,PEDTYPE,PEDACT,PEDCOND,MANOEUVER,DRIVCOND,
                            HOOD_140,NEIGHBOURHOOD_140,HOOD_158,DIVISION,geometry))
-#drop date, assume independent of date/most of the variation informed by date is 
-#encapsulated by other features (ie. weather)
-#exact location is too difficult to incorporate, general location is already 
-#encapsulated in intersection and neighborhood
-#WARDNUM redundant, too similar to neighborhoods, neighborhoods more interpretable
-#FATAL_NO missing too much info
-#PED & CYC actions missing too much info
-#ACCLOC conveys same information as LOCCOORD
-#INJURY too similar to ACCLASS
-#VEHTYPE already addressed by other features
-#DRIVCOND already addressed by other features
-#MANOEUVER too similar to DRIVACT
-#Police division perfectly correlated with neighborhood
 
 
-### Data Cleaning ###
-
+### Data Preprocessing ###
 #To reduce dimensionality, small subgroupings were grouped into "Other" category
 
 df <- df |> 
@@ -58,11 +43,14 @@ df <- df |>
     .default = ROAD_CLASS))) |> 
   mutate(LOCCOORD = as.factor(case_when(
     LOCCOORD %in% c("Intersection","Mid-Block") ~ LOCCOORD,
-    .default = "Other"))) |> #Other = Exit/entrance ramps, park, private property, public lane, None
+    .default = "Other"))) |> 
+  #Other = Exit/entrance ramps, park, private property, public lane, None
   mutate(TRAFFCTL = as.factor(case_when(
     TRAFFCTL %in% c("None","No Control") ~ "No Control",
     TRAFFCTL %in% c("Traffic Signal", "Stop Sign") ~ TRAFFCTL,
-    .default = "Other"))) |> #Other = Pedestrian Crossover, Traffic controller, yield sign, school guard, police control, traffic gate, streetcar
+    .default = "Other"))) |> 
+  #Other = Pedestrian Crossover, Traffic controller, yield sign, school guard, 
+  #police control, traffic gate, streetcar
   mutate(VISIBILITY = as.factor(case_when(
     VISIBILITY == "Drifting Snow" ~ "Snow",
     VISIBILITY == "Freezing Rain" ~ "Rain",
@@ -79,19 +67,21 @@ df <- df |>
     .default = LIGHT))) |> #create new feature for artificial light
   mutate(RDSFCOND = as.factor(case_when(
     RDSFCOND %in% c("Dry","Wet") ~ RDSFCOND,
-    .default = "Other"))) |> #Other = Slush, loose snow, ice, packed snow, sand/gravel, none, other
+    .default = "Other"))) |> 
+  #Other = Slush, loose snow, ice, packed snow, sand/gravel, none, other
   mutate(ACCLASS = relevel(as.factor(case_when(
     ACCLASS == "Fatal" ~ "Fatal",
     TRUE ~ "Non-Fatal")),"Non-Fatal")) |>
   mutate(IMPACTYPE = as.factor(case_when(
     grepl("SMV",IMPACTYPE,fixed=T) ~ "SMV",
     IMPACTYPE == "None" ~ "Other",
-    .default = IMPACTYPE))) |> #Angle collisions are the most common fatal type in canada
+    .default = IMPACTYPE))) |> #Angle collisions = most common fatal type in Canada
   mutate(INVTYPE = as.factor(case_when(
     grepl("Driver",INVTYPE,fixed=T) ~ "Driver",
     grepl("Passenger",INVTYPE,fixed=T) ~ "Passenger",
     grepl("Pedestrian",INVTYPE,fixed=T) ~ "Pedestrian",
-    .default = "Other"))) |> #Other = cyclist, property owner, trailer owner, witness, vehicle owner, other
+    .default = "Other"))) |> 
+  #Other = cyclist, property owner, trailer owner, witness, vehicle owner, other
   mutate(INVAGE = factor(case_when(
     INVAGE %in% c("0 to 4","5 to 9","10 to 14","15 to 19") ~ "Adolescence",
     INVAGE %in% c("20 to 24","25 to 29","30 to 34","35 to 39") ~ "Early Adulthood",
@@ -99,7 +89,8 @@ df <- df |>
     INVAGE %in% c("60 to 64","65 to 69","70 to 74","75 to 79",
                   "80 to 84","85 to 89","90 to 94","Over 95") ~ "Late Adulthood",
     INVAGE == "unknown" ~ "Unknown"),
-    levels = c("Adolescence","Early Adulthood","Mid Adulthood","Late Adulthood","Unknown"))) |>
+    levels = c("Adolescence","Early Adulthood","Mid Adulthood","Late Adulthood",
+               "Unknown"))) |>
   mutate(INITDIR = as.factor(case_when(
     INITDIR == "None" ~ "Unknown",
     .default = INITDIR))) |>
@@ -124,8 +115,7 @@ sum(is.na(df))
 
 
 ### EDA ###
-
-t1 <- df %>%
+t1 <- df |>
   tbl_summary(include = c(SPEEDING,IMPACTYPE,INVAGE,PEDESTRIAN,ALCOHOL),
               label = c(SPEEDING ~ "Speeding-related",
                         IMPACTYPE ~ "Type of Impact",
@@ -133,13 +123,13 @@ t1 <- df %>%
                         PEDESTRIAN ~ "Pedestrian Involved",
                         ALCOHOL ~ "Alcohol-related"),
               sort = IMPACTYPE ~ "frequency",
-              by = ACCLASS) %>%
-  add_overall(last = TRUE, col_label = "**Total**", statistic = ~ "{n}") %>%
-  add_p() %>%
-  modify_header(label ~ "**Risk Factor**") %>%
-  modify_spanning_header(c("stat_1","stat_2") ~ "**Accident Class**") %>%
-  modify_caption("**Table 1. Distribution of fatal and non-fatal MVCs by risk factor**") %>%
-  bold_labels() %>%
+              by = ACCLASS) |>
+  add_overall(last = TRUE, col_label = "**Total**", statistic = ~ "{n}") |>
+  add_p() |>
+  modify_header(label ~ "**Risk Factor**") |>
+  modify_spanning_header(c("stat_1","stat_2") ~ "**Accident Class**") |>
+  modify_caption("**Table 1. Distribution of fatal and non-fatal MVCs by risk factor**") |>
+  bold_labels() |>
   modify_footnote(c(stat_1,stat_2) ~ "Count (%)",
                   stat_0 ~ "Count")
 
@@ -147,15 +137,14 @@ gt::gtsave(as_gt(t1), file = file.path(tempdir(), "t1.png"))
 
 
 ### Variable Selection ###
-
 #Each accident is assumed to be independent of one another
 
 ST <- Sys.time()
 glm.mod1 <- glm(ACCLASS ~ ., family = binomial(link = logit), data = df)
 Sys.time() - ST
 
-ST <- Sys.time()
 #AIC
+ST <- Sys.time()
 sel.var.aic <- step(glm.mod1, trace = 0, k = 2, direction = "both") 
 select_var_aic<-attr(terms(sel.var.aic), "term.labels") 
 Sys.time() - ST
@@ -169,12 +158,10 @@ Sys.time() - ST
 
 
 #LASSO/Elastic net
-set.seed(1)
-
 x <- model.matrix( ~ ., df[,which(colnames(df) != "ACCLASS")])
 y <- df$ACCLASS
 
-cvfit <- cv.glmnet(x, y, family = "binomial", type.measure = "class") #Minimize misclassification error
+cvfit <- cv.glmnet(x, y, family = "binomial", type.measure = "class")
 #plot(cvfit)
 #y_pred <- predict(cvfit, newx = x, type = "class",s = cvfit$lambda.min)
 #misclasserror <- mean(y_pred != y)
@@ -295,7 +282,7 @@ lrtest(glm.bic, glm.bic2)
 
 ### Final model ###
 
-t3 <- glm.bic2 %>%
+t3 <- glm.bic2 |>
   tbl_regression(exponentiate = TRUE,
                  show_single_row = c("MOTORCYCLE","TRUCK","TRSN_CITY_VEH","PASSENGER","SPEEDING","AG_DRIV","REDLIGHT","ATFLIGHT"),
                  label = c(YEAR ~ "Year",
@@ -310,11 +297,11 @@ t3 <- glm.bic2 %>%
                            SPEEDING ~ "Speeding-related",
                            AG_DRIV ~ "Aggressive Driving-related",
                            REDLIGHT ~ "Redlight-related",
-                           ATFLIGHT ~ "Artificial light")) %>%
-  modify_header(label ~ "**Risk Factor**", estimate ~ "**AOR**") %>%
-  modify_caption("**Table 3. Final Logistic regression model results, representing the odds of fatality in a MVC in Toronto from 2006-2021.**") %>%
-  bold_labels() %>%
-  modify_footnote(c(everything() ~ NA, estimate ~ "AOR = Adjusted Odds Ratio", ci ~ "CI = Confidence Interval"), abbreviation = TRUE) %>%
+                           ATFLIGHT ~ "Artificial light")) |>
+  modify_header(label ~ "**Risk Factor**", estimate ~ "**AOR**") |>
+  modify_caption("**Table 3. Final Logistic regression model results, representing the odds of fatality in a MVC in Toronto from 2006-2021.**") |>
+  bold_labels() |>
+  modify_footnote(c(everything() ~ NA, estimate ~ "AOR = Adjusted Odds Ratio", ci ~ "CI = Confidence Interval"), abbreviation = TRUE) |>
   bold_p()
 
 gt::gtsave(as_gt(t3), file = file.path(tempdir(), "t3.png"))
